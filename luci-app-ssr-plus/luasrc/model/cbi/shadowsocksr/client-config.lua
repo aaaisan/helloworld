@@ -99,6 +99,13 @@ local securitys = {
 "chacha20-poly1305"
 }
 
+local flows = {
+"xtls-rprx-origin",
+"xtls-rprx-origin-udp443",
+"xtls-rprx-direct",
+"xtls-rprx-direct-udp443"
+}
+
 m = Map(shadowsocksr, translate("Edit ShadowSocksR Server"))
 m.redirect = luci.dispatcher.build_url("admin/services/shadowsocksr/servers")
 if m.uci:get(shadowsocksr, sid) ~= "servers" then
@@ -123,9 +130,13 @@ o:value("ss", translate("Shadowsocks New Version"))
 end
 if nixio.fs.access("/usr/bin/v2ray/v2ray") or nixio.fs.access("/usr/bin/v2ray") then
 o:value("v2ray", translate("V2Ray"))
+o:value("vless", translate("VLESS"))
 end
 if nixio.fs.access("/usr/sbin/trojan") then
 o:value("trojan", translate("Trojan"))
+end
+if nixio.fs.access("/usr/bin/naive") then
+o:value("naiveproxy", translate("NaiveProxy"))
 end
 if nixio.fs.access("/usr/sbin/redsocks2") then
 o:value("socks5", translate("Socks5"))
@@ -148,7 +159,9 @@ o.rmempty = false
 o:depends("type", "ssr")
 o:depends("type", "ss")
 o:depends("type", "v2ray")
+o:depends("type", "vless")
 o:depends("type", "trojan")
+o:depends("type", "naiveproxy")
 o:depends("type", "socks5")
 
 o = s:option(Value, "server_port", translate("Server Port"))
@@ -157,7 +170,9 @@ o.rmempty = false
 o:depends("type", "ssr")
 o:depends("type", "ss")
 o:depends("type", "v2ray")
+o:depends("type", "vless")
 o:depends("type", "trojan")
+o:depends("type", "naiveproxy")
 o:depends("type", "socks5")
 
 o = s:option(Flag, "auth_enable", translate("Enable Authentication"))
@@ -167,6 +182,7 @@ o:depends("type", "socks5")
 
 o = s:option(Value, "username", translate("Username"))
 o.rmempty = true
+o:depends("type", "naiveproxy")
 o:depends("type", "socks5")
 
 o = s:option(Value, "password", translate("Password"))
@@ -175,6 +191,7 @@ o.rmempty = true
 o:depends("type", "ssr")
 o:depends("type", "ss")
 o:depends("type", "trojan")
+o:depends("type", "naiveproxy")
 o:depends("type", "socks5")
 
 o = s:option(ListValue, "encrypt_method", translate("Encrypt Method"))
@@ -220,10 +237,17 @@ o.rmempty = true
 o:depends("type", "v2ray")
 
 -- VmessId
-o = s:option(Value, "vmess_id", translate("VmessId (UUID)"))
+o = s:option(Value, "vmess_id", translate("Vmess/VLESS ID (UUID)"))
 o.rmempty = true
 o.default = uuid
 o:depends("type", "v2ray")
+o:depends("type", "vless")
+
+-- VLESS Encryption
+o = s:option(Value, "vless_encryption", translate("VLESS Encryption"))
+o.rmempty = true
+o.default = "none"
+o:depends("type", "vless")
 
 -- 加密方式
 o = s:option(ListValue, "security", translate("Encrypt Method"))
@@ -240,6 +264,7 @@ o:value("h2", "HTTP/2")
 o:value("quic", "QUIC")
 o.rmempty = true
 o:depends("type", "v2ray")
+o:depends("type", "vless")
 
 -- [[ TCP部分 ]]--
 
@@ -363,6 +388,7 @@ o.rmempty = true
 o = s:option(Flag, "insecure", translate("allowInsecure"))
 o.rmempty = false
 o:depends("type", "v2ray")
+o:depends("type", "vless")
 o:depends("type", "trojan")
 o.default = "1"
 o.description = translate("If true, allowss insecure connection at TLS client, e.g., TLS server uses unverifiable certificates.")
@@ -371,6 +397,7 @@ o = s:option(Flag, "tls", translate("TLS"))
 o.rmempty = true
 o.default = "0"
 o:depends("type", "v2ray")
+o:depends("type", "vless")
 o:depends("type", "trojan")
 
 o = s:option(Value, "tls_host", translate("TLS Host"))
@@ -378,11 +405,25 @@ o = s:option(Value, "tls_host", translate("TLS Host"))
 o:depends("tls", "1")
 o.rmempty = true
 
+-- XTLS
+o = s:option(Flag, "xtls", translate("XTLS"))
+o.rmempty = true
+o.default = "0"
+o:depends({type="vless", tls="1"})
+
+-- Flow
+o = s:option(Value, "vless_flow", translate("Flow"))
+for _, v in ipairs(flows) do o:value(v, v) end
+o.rmempty = true
+o.default = "xtls-rprx-origin"
+o:depends("xtls", "1")
+
 -- [[ Mux ]]--
 o = s:option(Flag, "mux", translate("Mux"))
 o.rmempty = true
 o.default = "0"
 o:depends("type", "v2ray")
+o:depends("type", "vless")
 
 o = s:option(Value, "concurrency", translate("Concurrency"))
 o.datatype = "uinteger"
@@ -396,6 +437,7 @@ o.rmempty = true
 o.default = "0"
 o:depends("type", "trojan")
 o:depends("type", "v2ray")
+o:depends("type", "vless")
 o.description = translate("If you have a self-signed certificate,please check the box")
 
 o = s:option(DummyValue, "upload", translate("Upload"))
